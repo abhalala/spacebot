@@ -212,6 +212,7 @@ pub struct LlmConfig {
     pub minimax_cn_key: Option<String>,
     pub moonshot_key: Option<String>,
     pub zai_coding_plan_key: Option<String>,
+    pub kilo_key: Option<String>,
     pub providers: HashMap<String, ProviderConfig>,
 }
 
@@ -278,6 +279,10 @@ impl std::fmt::Debug for LlmConfig {
                 "zai_coding_plan_key",
                 &self.zai_coding_plan_key.as_ref().map(|_| "[REDACTED]"),
             )
+            .field(
+                "kilo_key",
+                &self.kilo_key.as_ref().map(|_| "[REDACTED]"),
+            )
             .field("providers", &self.providers)
             .finish()
     }
@@ -305,6 +310,7 @@ impl LlmConfig {
             || self.minimax_cn_key.is_some()
             || self.moonshot_key.is_some()
             || self.zai_coding_plan_key.is_some()
+            || self.kilo_key.is_some()
             || !self.providers.is_empty()
     }
 }
@@ -328,6 +334,7 @@ const NVIDIA_PROVIDER_BASE_URL: &str = "https://integrate.api.nvidia.com";
 const FIREWORKS_PROVIDER_BASE_URL: &str = "https://api.fireworks.ai/inference";
 pub(crate) const GEMINI_PROVIDER_BASE_URL: &str =
     "https://generativelanguage.googleapis.com/v1beta/openai";
+const KILO_PROVIDER_BASE_URL: &str = "https://api.kilo.ai/v1";
 
 /// Defaults inherited by all agents. Individual agents can override any field.
 #[derive(Clone)]
@@ -1619,6 +1626,7 @@ struct TomlLlmConfigFields {
     minimax_cn_key: Option<String>,
     moonshot_key: Option<String>,
     zai_coding_plan_key: Option<String>,
+    kilo_key: Option<String>,
     #[serde(default)]
     providers: HashMap<String, TomlProviderConfig>,
     #[serde(default)]
@@ -1647,6 +1655,7 @@ struct TomlLlmConfig {
     minimax_cn_key: Option<String>,
     moonshot_key: Option<String>,
     zai_coding_plan_key: Option<String>,
+    kilo_key: Option<String>,
     providers: HashMap<String, TomlProviderConfig>,
 }
 
@@ -1700,6 +1709,7 @@ impl<'de> Deserialize<'de> for TomlLlmConfig {
             minimax_cn_key: fields.minimax_cn_key,
             moonshot_key: fields.moonshot_key,
             zai_coding_plan_key: fields.zai_coding_plan_key,
+            kilo_key: fields.kilo_key,
             providers: fields.providers,
         })
     }
@@ -2222,7 +2232,8 @@ impl Config {
             || std::env::var("OPENCODE_ZEN_API_KEY").is_ok()
             || std::env::var("MINIMAX_API_KEY").is_ok()
             || std::env::var("MOONSHOT_API_KEY").is_ok()
-            || std::env::var("ZAI_CODING_PLAN_API_KEY").is_ok();
+            || std::env::var("ZAI_CODING_PLAN_API_KEY").is_ok()
+            || std::env::var("KILO_API_KEY").is_ok();
 
         // If we have any legacy keys, no onboarding needed
         if has_legacy_keys {
@@ -2300,6 +2311,7 @@ impl Config {
             minimax_cn_key: std::env::var("MINIMAX_CN_API_KEY").ok(),
             moonshot_key: std::env::var("MOONSHOT_API_KEY").ok(),
             zai_coding_plan_key: std::env::var("ZAI_CODING_PLAN_API_KEY").ok(),
+            kilo_key: std::env::var("KILO_API_KEY").ok(),
             providers: HashMap::new(),
         };
 
@@ -2361,6 +2373,18 @@ impl Config {
                     api_type: ApiType::OpenAiCompletions,
                     base_url: ZAI_CODING_PLAN_BASE_URL.to_string(),
                     api_key: zai_coding_plan_key,
+                    name: None,
+                    use_bearer_auth: false,
+                });
+        }
+
+        if let Some(kilo_key) = llm.kilo_key.clone() {
+            llm.providers
+                .entry("kilo".to_string())
+                .or_insert_with(|| ProviderConfig {
+                    api_type: ApiType::OpenAiCompletions,
+                    base_url: KILO_PROVIDER_BASE_URL.to_string(),
+                    api_key: kilo_key,
                     name: None,
                     use_bearer_auth: false,
                 });
@@ -2781,6 +2805,12 @@ impl Config {
                 .as_deref()
                 .and_then(resolve_env_value)
                 .or_else(|| std::env::var("ZAI_CODING_PLAN_API_KEY").ok()),
+            kilo_key: toml
+                .llm
+                .kilo_key
+                .as_deref()
+                .and_then(resolve_env_value)
+                .or_else(|| std::env::var("KILO_API_KEY").ok()),
             providers: toml
                 .llm
                 .providers
@@ -2868,6 +2898,18 @@ impl Config {
                     api_type: ApiType::OpenAiCompletions,
                     base_url: ZAI_CODING_PLAN_BASE_URL.to_string(),
                     api_key: zai_coding_plan_key,
+                    name: None,
+                    use_bearer_auth: false,
+                });
+        }
+
+        if let Some(kilo_key) = llm.kilo_key.clone() {
+            llm.providers
+                .entry("kilo".to_string())
+                .or_insert_with(|| ProviderConfig {
+                    api_type: ApiType::OpenAiCompletions,
+                    base_url: KILO_PROVIDER_BASE_URL.to_string(),
+                    api_key: kilo_key,
                     name: None,
                     use_bearer_auth: false,
                 });
@@ -4267,6 +4309,7 @@ pub fn run_onboarding() -> anyhow::Result<Option<PathBuf>> {
         "MiniMax",
         "Moonshot AI (Kimi)",
         "Z.AI Coding Plan",
+        "Kilo",
     ];
     let provider_idx = Select::new()
         .with_prompt("Which LLM provider do you want to use?")
@@ -4330,6 +4373,7 @@ pub fn run_onboarding() -> anyhow::Result<Option<PathBuf>> {
             "zai_coding_plan_key",
             "zai-coding-plan",
         ),
+        16 => ("Kilo API key", "kilo_key", "kilo"),
         _ => unreachable!(),
     };
     let is_secret = provider_id != "ollama";
@@ -5384,6 +5428,7 @@ startup_delay_secs = 2
                 "ollama",
                 "localhost:11434",
             ),
+            ("kilo_key", "test-key", "kilo", "kilo.ai"),
         ];
 
         for (toml_key, toml_value, provider_name, url_substr) in cases {
@@ -5445,6 +5490,7 @@ startup_delay_secs = 2
                 "ollama",
                 "localhost:11434",
             ),
+            ("KILO_API_KEY", "test-key", "kilo", "kilo.ai"),
         ];
 
         for (env_var, env_value, provider_name, url_substr) in cases {
