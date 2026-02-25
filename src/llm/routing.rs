@@ -358,6 +358,22 @@ pub fn defaults_for_provider(provider: &str) -> RoutingConfig {
         "minimax-cn" => RoutingConfig::for_model("minimax-cn/MiniMax-M2.5".into()),
         "moonshot" => RoutingConfig::for_model("moonshot/kimi-k2.5".into()),
         "zai-coding-plan" => RoutingConfig::for_model("zai-coding-plan/glm-5".into()),
+        "kilo" => {
+            let channel: String = "kilo/claude-sonnet-4-5".into();
+            let worker: String = "kilo/claude-haiku-4-5".into();
+            RoutingConfig {
+                channel: channel.clone(),
+                branch: channel.clone(),
+                worker: worker.clone(),
+                compactor: worker.clone(),
+                cortex: worker.clone(),
+                voice: String::new(),
+                task_overrides: HashMap::from([("coding".into(), channel.clone())]),
+                fallbacks: HashMap::from([(channel, vec![worker])]),
+                rate_limit_cooldown_secs: 60,
+                ..RoutingConfig::default()
+            }
+        }
         // Unknown — use the standard defaults
         _ => RoutingConfig::default(),
     }
@@ -384,6 +400,7 @@ pub fn provider_to_prefix(provider: &str) -> &str {
         "minimax-cn" => "minimax-cn/",
         "moonshot" => "moonshot/",
         "zai-coding-plan" => "zai-coding-plan/",
+        "kilo" => "kilo/",
         _ => "",
     }
 }

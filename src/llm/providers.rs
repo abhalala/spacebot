@@ -41,5 +41,9 @@ pub async fn init_providers(config: &LlmConfig) -> Result<()> {
         tracing::info!("Google Gemini provider configured");
     }
 
+    if config.kilo_key.is_some() {
+        tracing::info!("Kilo provider configured");
+    }
+
     Ok(())
 }
