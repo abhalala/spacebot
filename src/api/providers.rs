@@ -58,6 +58,7 @@ pub(super) struct ProviderStatus {
     minimax_cn: bool,
     moonshot: bool,
     zai_coding_plan: bool,
+    kilo: bool,
 }
 
 #[derive(Serialize)]
@@ -142,6 +143,7 @@ fn provider_toml_key(provider: &str) -> Option<&'static str> {
         "minimax-cn" => Some("minimax_cn_key"),
         "moonshot" => Some("moonshot_key"),
         "zai-coding-plan" => Some("zai_coding_plan_key"),
+        "kilo" => Some("kilo_key"),
         _ => None,
     }
 }
@@ -288,6 +290,13 @@ fn build_test_llm_config(provider: &str, credential: &str) -> crate::config::Llm
             name: None,
             use_bearer_auth: false,
         }),
+        "kilo" => Some(ProviderConfig {
+            api_type: ApiType::OpenAiCompletions,
+            base_url: "https://api.kilo.ai/v1".to_string(),
+            api_key: credential.to_string(),
+            name: None,
+            use_bearer_auth: false,
+        }),
         _ => None,
     };
 
@@ -315,6 +324,7 @@ fn build_test_llm_config(provider: &str, credential: &str) -> crate::config::Llm
         minimax_cn_key: (provider == "minimax-cn").then(|| credential.to_string()),
         moonshot_key: (provider == "moonshot").then(|| credential.to_string()),
         zai_coding_plan_key: (provider == "zai-coding-plan").then(|| credential.to_string()),
+        kilo_key: (provider == "kilo").then(|| credential.to_string()),
         providers,
     }
 }
@@ -465,6 +475,7 @@ pub(super) async fn get_providers(
         minimax_cn,
         moonshot,
         zai_coding_plan,
+        kilo,
     ) = if config_path.exists() {
         let content = tokio::fs::read_to_string(&config_path)
             .await
@@ -507,6 +518,7 @@ pub(super) async fn get_providers(
             has_value("minimax_cn_key", "MINIMAX_CN_API_KEY"),
             has_value("moonshot_key", "MOONSHOT_API_KEY"),
             has_value("zai_coding_plan_key", "ZAI_CODING_PLAN_API_KEY"),
+            has_value("kilo_key", "KILO_API_KEY"),
         )
     } else {
         (
@@ -529,6 +541,7 @@ pub(super) async fn get_providers(
             std::env::var("MINIMAX_CN_API_KEY").is_ok(),
             std::env::var("MOONSHOT_API_KEY").is_ok(),
             std::env::var("ZAI_CODING_PLAN_API_KEY").is_ok(),
+            std::env::var("KILO_API_KEY").is_ok(),
         )
     };
 
@@ -552,6 +565,7 @@ pub(super) async fn get_providers(
         minimax_cn,
         moonshot,
         zai_coding_plan,
+        kilo,
     };
     let has_any = providers.anthropic
         || providers.openai
@@ -571,7 +585,8 @@ pub(super) async fn get_providers(
         || providers.minimax
         || providers.minimax_cn
         || providers.moonshot
-        || providers.zai_coding_plan;
+        || providers.zai_coding_plan
+        || providers.kilo;
 
     Ok(Json(ProvidersResponse { providers, has_any }))
 }
