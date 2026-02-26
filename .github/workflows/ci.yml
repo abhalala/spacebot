@@ -64,12 +64,14 @@ jobs:
   build:
     name: Build (${{ matrix.target }})
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-24.04
           - target: aarch64-unknown-linux-gnu
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-24.04
+            cross_compile: true
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -85,7 +87,13 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Install cross-compilation toolchain (aarch64 only)
+        if: matrix.cross_compile
+        run: sudo apt-get install -y gcc-aarch64-linux-gnu
+
       - name: cargo build
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross_compile && 'aarch64-linux-gnu-gcc' || '' }}
         run: cargo build --release --target ${{ matrix.target }}
 
   interface:
