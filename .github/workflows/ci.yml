@@ -111,3 +111,21 @@ jobs:
       - name: Build
         working-directory: interface
         run: bun run build
+
+  auto-tag:
+    name: Auto Tag
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [check, fmt, test, build, interface]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bump version and push tag
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch
+          tag_prefix: v
